@@ -6,10 +6,12 @@ import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import io.reactivex.Observable;
 import io.reactivex.ObservableEmitter;
 import io.reactivex.ObservableOnSubscribe;
+import io.reactivex.ObservableSource;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Function;
@@ -27,29 +29,29 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         /*MAP() operator transforms the items of an observable and emits the modified items*/
 
-        getObservableUsers().subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread()).map(new Function<User, User>() {
+
+        getUsersObservable().subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread()).flatMap(new Function<User, ObservableSource<User>>() {
             @Override
-            public User apply(User user) throws Exception {
-                user.setEmail(String.format("%s@rxjava.com", user.name));
-                user.setName(user.name.toUpperCase());
-                return user;
+            public ObservableSource<User> apply(User user) {
+                return getAddressObservable(user);
             }
         }).subscribe(new DisposableObserver<User>() {
             @Override
             public void onNext(User user) {
-                Log.d(TAG, "onNext : Name " + user.getName() + " Email : " + user.getEmail() + " Gender : " + user.getGender());
+                Log.d(TAG, "onNext: " + "Name : " + user.getName() + " Gender : " + user.getGender() + " Address: " + user.getAddress().getAddress());
 
             }
 
             @Override
             public void onError(Throwable e) {
+                Log.d(TAG, "Error : " + e.getMessage());
 
             }
 
             @Override
             public void onComplete() {
-                Log.d(TAG, "onComplete");
 
+                Log.d(TAG, "onComplete");
             }
         });
 
@@ -57,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    Observable<User> getObservableUsers() {
+    Observable<User> getUsersObservable() {
         String[] names = {"Aman", "Ajay", "Rahul", "Abhisekh", "Rohit", "Gayle"};
         final List<User> userList = new ArrayList<>();
         for (String name : names) {
@@ -82,4 +84,28 @@ public class MainActivity extends AppCompatActivity {
             }
         }).subscribeOn(Schedulers.io());
     }
+
+
+    Observable<User> getAddressObservable(final User user) {
+        final String[] addresses = {"1600 Amphitheatre Parkway, Mountain View, CA 94043",
+                "2300 Traverwood Dr. Ann Arbor, MI 48105",
+                "500 W 2nd St Suite 2900 Austin, TX 78701",
+                "355 Main Street Cambridge, MA 02142"};
+
+        return Observable.create(new ObservableOnSubscribe<User>() {
+            @Override
+            public void subscribe(ObservableEmitter<User> emitter) throws Exception {
+                Address address = new Address();  //maps the User item
+                address.setAddress(addresses[new Random().nextInt(2) + 0]);
+                if (!emitter.isDisposed())
+                    user.setAddress(address);
+                int sleepTime = new Random().nextInt(1000) + 500;   //generates for network latency
+                Thread.sleep(sleepTime);
+                emitter.onNext(user);  //set to next user reactive
+                emitter.onComplete();  //signals a completion
+
+            }
+        }).subscribeOn(Schedulers.io());
+    }
+
 }
